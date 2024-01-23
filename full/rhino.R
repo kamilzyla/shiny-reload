@@ -1,8 +1,8 @@
 message("=== rhino.R ===")
 
 load_main <- function() {
-  env = new.env(parent = baseenv())
-  local(box::use(./main), env)
+  app_env <- new.env(parent = baseenv())
+  local(box::use(./main), app_env)
 
   clear_callback <- get0("clear_callback", envir = .GlobalEnv)
   if (!is.null(clear_callback)) {
@@ -12,23 +12,25 @@ load_main <- function() {
   message("@ Registering callback")
   .GlobalEnv$clear_callback <- shiny:::autoReloadCallbacks$register(function() {
     message("@ Callback")
-    local(box::reload(main), env)
+    local(box::reload(main), app_env)
   })
 
-  env
+  wrap(app_env)
 }
 
-wrap <- function(env) {
+wrap <- function(app_env) {
+  # The reloading works, because both UI and server are functions
+  # which retrieve the main module from `app_env`.
   list(
-    ui = function(request) env$main$ui,
+    ui = function(request) app_env$main$ui,
     server = function(input, output) {
-      env$main$server()
+      app_env$main$server()
     }
   )
 }
 
 app <- function() {
-  main <- wrap(load_main())
+  main <- load_main()
   shiny::shinyApp(
     ui = main$ui,
     server = main$server
