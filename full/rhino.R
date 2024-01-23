@@ -1,25 +1,36 @@
 message("=== rhino.R ===")
 
-clear_callback <- NULL
-
 load_main <- function() {
   env = new.env(parent = baseenv())
   local(box::use(./main), env)
 
+  clear_callback <- get0("clear_callback", envir = .GlobalEnv)
   if (!is.null(clear_callback)) {
+    message("@ Clearing previous callback")
     clear_callback()
   }
-  clear_callback <<- shiny:::autoReloadCallbacks$register(function() {
+  message("@ Registering callback")
+  .GlobalEnv$clear_callback <- shiny:::autoReloadCallbacks$register(function() {
+    message("@ Callback")
     local(box::reload(main), env)
   })
 
   env
 }
 
+wrap <- function(env) {
+  list(
+    ui = function(request) env$main$ui,
+    server = function(input, output) {
+      env$main$server()
+    }
+  )
+}
+
 app <- function() {
-  env <- load_main()
+  main <- wrap(load_main())
   shiny::shinyApp(
-    ui = env$main$ui,
-    server = env$main$server
+    ui = main$ui,
+    server = main$server
   )
 }

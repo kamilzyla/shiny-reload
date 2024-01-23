@@ -1,5 +1,7 @@
 message("=== main.R ===")
 
-ui <- "Hello!"
+box::use(./module[number])
+
+ui <- paste0(number, "!")
 
 server <- function(input, output) {}
