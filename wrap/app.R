@@ -1,3 +1,5 @@
+message("=== app.R ===")
+
 source("wrap.R", keep.source = TRUE)
 
 server <- function(input, output) {

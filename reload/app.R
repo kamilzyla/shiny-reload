@@ -1,6 +1,8 @@
+message("=== app.R ===")
+
 .GlobalEnv$count <- get0("count", envir = .GlobalEnv, ifnotfound = 0) + 1
-msg <- paste("=== RELOAD", count)
-message("register ", count)
+msg <- paste("@ reload", count)
+message("@ register callback ", count)
 shiny:::autoReloadCallbacks$register(function() {
   message(msg)
 })
