@@ -1,3 +1,4 @@
 message("=== module.R ===")
 
-number <- 1
+ui_text <- "Nice UI!"
+server_text <- "Nice server!"

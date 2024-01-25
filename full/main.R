@@ -1,7 +1,15 @@
 message("=== main.R ===")
 
-box::use(./module[number])
+box::use(
+  shiny,
+  ./module,
+)
 
-ui <- paste0(number, "!")
+ui <- shiny$tagList(
+  paste("UI:", module$ui_text),
+  shiny$textOutput("message")
+)
 
-server <- function(input, output) {}
+server <- function(input, output) {
+  output$message <- shiny$renderText(paste("Server:", module$server_text))
+}
