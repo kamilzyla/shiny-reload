@@ -1,15 +1,15 @@
 message("=== rhino.R ===")
 
 app <- function() {
-  app_env <- load_app()
-
-  # There are two key components to make automatic reloading work:
+  # There are two key components to make `shiny.autoreload` work:
   # 1. When app files are modified, the reload callback refreshes the `main` module in `app_env`.
   # 2. UI and server are functions which retrieve `main` from `app_env` each time they are called.
   #
-  # If we retrieved the `main` module once before the functions are defined below,
+  # If we retrieved the `main` module only once before the UI/server functions are defined below,
   # or if we passed `main$ui` and `main$server` directly to `shinyApp()`,
   # reloading wouldn't work.
+
+  app_env <- load_app()
   shiny::shinyApp(
     ui = function(request) app_env$main$ui,
     server = function(...) {
@@ -19,41 +19,50 @@ app <- function() {
 }
 
 load_app <- function() {
+  # We use the same method both for loading the main module initially and for reloading it.
+  # This guarantees consistent behavior regardless of whether user enables `shiny.autoreload`,
+  # or calls `shiny::runApp()` each time they want to see changes.
+  #
+  # If `box::use()` fails while reloading (e.g. due to a syntax error),
+  # the `main` module won't be replaced in `app_env` and the app should continue to work.
+  #
+  # We always register an auto-reload callback.
+  # Shiny just won't call it unless `shiny.autoreload` option is set.
+
   app_env <- new.env(parent = baseenv())
   load_main <- function() {
-    # We could also use box::reload().
-    # Purge box cache so that changes to code take effect when calling `shiny::runApp()` multiple times in the same R session.
     box::purge_cache()
-    # If box::use() fails during reload, the main module won't be replaced in `app_env`
-    # and the app will continue to work.
     local(box::use(./main), app_env)
   }
 
   load_main()
-  # We always register an auto-reload callback.
-  # Shiny just won't call it if the `shiny.autoreload` option is not set.
   register_reload_callback(load_main)
 
   app_env
 }
 
 register_reload_callback <- function(callback) {
-  # We need to clear the previous callback, as otherwise we'd register a new callback each time
-  # rhino::app() is called.
-  # This happens when calling `shiny::runApp()` multiple times in the same session
-  # and after refreshing the app page after `app.R` was touched (this happens even without shiny.autoreload).
-  # We'd end up with multiple reload callbacks thus leading to a resource leak.
+  # Before installing a new reload callback, we need to clear the previous one:
+  # 1. Users might call `shiny::runApp()` multiple times in the same R session.
+  # 2. Shiny will source `app.R` again after its timestamp is updated
+  #    (this happens even without `shiny.autoreload`).
+  #
+  # We use `.GlobalEnv` to store `clear_callback` in this example.
+  # We'd use package environment inside a package.
+  #
+  # If the reload callback throws an error, we catch it and print it.
+  # Allowing it to propagate would break reloading in the current `shiny::runApp()` call.
+
   clear_callback <- get0("clear_callback", envir = .GlobalEnv)
   if (!is.null(clear_callback)) {
     message("@ Clearing callback")
     clear_callback()
   }
+
   message("@ Registering callback")
-  # We use global environment here. We'd use package environment in the package.
   .GlobalEnv$clear_callback <- shiny:::autoReloadCallbacks$register(
     function() {
       message("@ Callback")
-      # If we allowed the error to propagate, reloading would stop working in the current session.
       tryCatch(
         callback(),
         error = function(cond) message(conditionMessage(cond))
